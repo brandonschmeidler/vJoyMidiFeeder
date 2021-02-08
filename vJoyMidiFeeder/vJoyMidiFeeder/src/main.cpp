@@ -1,18 +1,65 @@
 #include "AppHeaders.h"
 
-static int glfw_current_error_code = 0;
-static std::string glfw_current_error_desc = "";
-static int glfw_window_width = 800;
-static int glfw_window_height = 600;
-static int glfw_window_x = 0;
-static int glfw_window_y = 0;
+namespace ImGui
+{
+	static auto vector_getter = [](void* vec, int idx, const char** out_text)
+	{
+		auto& vector = *static_cast<std::vector<std::string>*>(vec);
+		if (idx < 0 || idx >= static_cast<int>(vector.size())) { return false; }
+		*out_text = vector.at(idx).c_str();
+		return true;
+	};
 
-static void glfw_error_callback(int error, const char* description) {
-	fprintf(stderr, "GLFW Error %d: %s\n", error, description);
-	glfw_current_error_code = error;
-	glfw_current_error_desc = description;
+	bool Combo(const char* label, int* currIndex, std::vector<std::string>& values)
+	{
+		if (values.empty()) { return false; }
+		return Combo(label, currIndex, vector_getter,
+			static_cast<void*>(&values), values.size());
+	}
+
+	bool ListBox(const char* label, int* currIndex, std::vector<std::string>& values)
+	{
+		if (values.empty()) { return false; }
+		return ListBox(label, currIndex, vector_getter,
+			static_cast<void*>(&values), values.size());
+	}
+
+}
+
+int glfw_current_error_code = 0;
+std::string glfw_current_error_desc = "";
+//int glfw_window_x = 0;
+//int glfw_window_y = 0;
+int glfw_window_width = 800;
+int glfw_window_height = 600;
+
+std::vector<std::string> available_midi_ports;
+int available_midi_port_count = 0;
+int available_midi_port_id = 0;
+
+void refresh_available_midi_ports(RtMidiIn* midi_in) {
+	available_midi_ports.clear();
+	available_midi_port_count = midi_in->getPortCount();
+	if (available_midi_port_count == 0) {
+		available_midi_ports.push_back("No available MIDI ports.");
+	}
+	else {
+		for (int i = 0; i < available_midi_port_count; ++i) {
+			std::string port_name = midi_in->getPortName(i);
+			available_midi_ports.push_back(port_name);
+		}
+	}
+}
+
+void imgui_show_error(int code, const char* desc) {
+	glfw_current_error_code = code;
+	glfw_current_error_desc = desc;
 	ImGui::OpenPopup("ERROR");
-	
+}
+
+void glfw_error_callback(int error, const char* description) {
+	fprintf(stderr, "GLFW Error %d: %s\n", error, description);
+	imgui_show_error(error, description);	
 }
 
 void glfw_framebuffer_size_callback(GLFWwindow* window, int width, int height) {
@@ -25,16 +72,51 @@ void glfw_process_input(GLFWwindow* window) {
 	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
 		glfwSetWindowShouldClose(window, true);
 	}
-
 }
+
+void midi_demo_callback(double deltatime, std::vector< unsigned char > *message, void *userData)
+{
+	unsigned int nBytes = message->size();
+	for (unsigned int i = 0; i < nBytes; i++)
+		std::cout << "Byte " << i << " = " << (int)message->at(i) << ", ";
+	if (nBytes > 0)
+		std::cout << "stamp = " << deltatime << std::endl;
+}
+//int midi_demo(RtMidiIn* midiin)
+//{
+//	//RtMidiIn *midiin = new RtMidiIn();
+//	// Check available ports.
+//	unsigned int nPorts = midiin->getPortCount();
+//	if (nPorts == 0) {
+//		std::cout << "No ports available!\n";
+//		goto cleanup;
+//	}
+//	midiin->openPort(0);
+//	// Set our callback function.  This should be done immediately after
+//	// opening the port to avoid having incoming messages written to the
+//	// queue.
+//	midiin->setCallback(&midi_demo_callback);
+//	// Don't ignore sysex, timing, or active sensing messages.
+//	midiin->ignoreTypes(false, false, false);
+//	std::cout << "\nReading MIDI input ... press <enter> to quit.\n";
+//	char input;
+//	std::cin.get(input);
+//	// Clean up
+//cleanup:
+//	delete midiin;
+//	return 0;
+//}
 
 
 
 int main() {
 
+	RtMidiIn* midi_in = new RtMidiIn();
+	refresh_available_midi_ports(midi_in);
+
 	glfwSetErrorCallback(glfw_error_callback);
 
-	if (!glfwInit()) return -1;
+	if (!glfwInit()) { return -1; }
 
 	const char* glsl_version = "#version 440";
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -42,16 +124,12 @@ int main() {
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
 	GLFWwindow* window = glfwCreateWindow(800, 600, "vJoy Midi Feeder v0.0.0", nullptr, nullptr);
-	if (!window) {
-		return -1;
-	}
+	if (!window) { return -1; }
 
 	glfwMakeContextCurrent(window);
 	glfwSwapInterval(1); // enable vsync. might not need this.
 
-	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) {
-		return -1;
-	}
+	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) { return -1; }
 
 	glViewport(0, 0, glfw_window_width, glfw_window_height);
 
@@ -66,6 +144,7 @@ int main() {
 
 	ImGui::StyleColorsDark();
 
+	
 	//ImGuiStyle& style = ImGui::GetStyle();
 	//style.WindowRounding = 0.0f;
 	//style.Colors[ImGuiCol_WindowBg].w = 1.0f;
@@ -86,19 +165,59 @@ int main() {
 		ImGui::NewFrame();
 
 		// ImGui drawing starts here
-		glfwGetWindowPos(window, &glfw_window_x, &glfw_window_y);
-		glfwGetWindowSize(window, &glfw_window_width, &glfw_window_height);
+		//glfwGetWindowPos(window, &glfw_window_x, &glfw_window_y);
 		//ImGui::SetNextWindowPos(ImVec2(glfw_window_x, glfw_window_y));
-		ImGui::SetNextWindowSize(ImVec2(glfw_window_width, glfw_window_height));
 		ImGui::SetNextWindowPos(ImVec2(0, 0));
+		glfwGetWindowSize(window, &glfw_window_width, &glfw_window_height);
+		ImGui::SetNextWindowSize(ImVec2(glfw_window_width, glfw_window_height));
 		ImGui::Begin("vJoy Midi Feeder", 0, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize);
-		if (ImGui::Button("Test Error")) {
-			glfw_current_error_code = 420;
-			glfw_current_error_desc = "I'm freakin' out man!";
-			ImGui::OpenPopup("ERROR");
+
+		static const char* preview_value = available_midi_ports[available_midi_port_id].c_str();
+		
+		if (ImGui::Button("Refresh")) {
+			refresh_available_midi_ports(midi_in);
+			preview_value = available_midi_ports[0].c_str();
 		}
 		
+		ImGui::SameLine();
 
+		ImGui::PushItemWidth(300.0f);
+		if (ImGui::BeginCombo("##combo_midiports", preview_value)) {
+
+			for (int i = 0; i < available_midi_port_count; ++i) {
+				bool is_selected = available_midi_port_id == i;
+				if (ImGui::Selectable(available_midi_ports[i].c_str(), is_selected)) {
+					available_midi_port_id = i;
+					preview_value = available_midi_ports[i].c_str();
+				}
+			}
+
+			ImGui::EndCombo();
+		}
+		ImGui::PopItemWidth();
+
+		ImGui::SameLine();
+		static bool midi_port_open = midi_in->isPortOpen();
+		//const char* label = midi_port_open ? "Turn Port Off" : "Turn Port On";
+		const ImVec4 color = ImVec4(midi_port_open ? 0.0f : 1.0f, midi_port_open ? 1.0f : 0.0f, 0.0f, 1.0f);
+		const ImGuiColorEditFlags flags = ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_NoTooltip;
+		if (ImGui::ColorButton("Toggle Port", color, flags)) {
+			if (midi_port_open) {
+				midi_in->cancelCallback();
+				midi_in->closePort();
+			}
+			else {
+				midi_in->openPort(available_midi_port_id);
+				midi_in->setCallback(&midi_demo_callback);
+			}
+			midi_port_open = midi_in->isPortOpen();
+		}
+
+
+		/*if (ImGui::Button("Test Error")) {
+			imgui_show_error(420, "I'm freakin' out man!");
+		}*/
+		
 		// error modal popup
 		if (ImGui::BeginPopupModal("ERROR", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
 			ImGui::Text("GLFW Error %d: %s\n", glfw_current_error_code, glfw_current_error_desc.c_str());
@@ -125,6 +244,12 @@ int main() {
 		//glfwMakeContextCurrent(backup_current_context);
 
 		glfwSwapBuffers(window);
+
+
+		// process logic after rendering I guess. I'll probably change this
+		if (midi_port_open) {
+			
+		}
 	}
 
 	ImGui_ImplOpenGL3_Shutdown();
