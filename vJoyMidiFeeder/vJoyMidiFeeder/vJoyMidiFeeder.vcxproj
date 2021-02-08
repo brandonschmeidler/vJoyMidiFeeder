@@ -97,6 +97,7 @@
     <ClCompile Include="src\RtMidi.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="src\AppHeaders.h" />
     <ClInclude Include="src\imconfig.h" />
     <ClInclude Include="src\imgui.h" />
     <ClInclude Include="src\imgui_impl_glfw.h" />
