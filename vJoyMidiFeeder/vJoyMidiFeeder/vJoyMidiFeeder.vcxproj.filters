@@ -45,9 +45,6 @@
     <ClCompile Include="src\imgui_extras.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\oldmain.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
