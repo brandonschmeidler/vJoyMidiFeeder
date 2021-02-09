@@ -9,6 +9,10 @@ const int MIDI_MSG_NOTE_ON = 144;
 const int MIDI_MSG_CC = 176;
 const int MIDI_MSG_PC = 192;
 RtMidiIn* midi_in = nullptr;
+int midi_monitor_status = 0;
+int midi_monitor_channel = 0;
+int midi_monitor_byte2 = 0;
+int midi_monitor_byte3 = 0;
 
 int glfw_current_error_code = 0;
 std::string glfw_current_error_desc = "";
@@ -19,7 +23,7 @@ std::vector<std::string> available_midi_ports;
 int available_midi_port_count = 0;
 int available_midi_port_id = 0;
 
-void refresh_available_midi_ports(RtMidiIn* midi_in) {
+void refresh_available_midi_ports() {
 
 	available_midi_ports.clear();
 	available_midi_port_count = midi_in->getPortCount();
@@ -34,33 +38,6 @@ void refresh_available_midi_ports(RtMidiIn* midi_in) {
 	}
 }
 
-void imgui_show_error(int code, const char* desc) {
-	glfw_current_error_code = code;
-	glfw_current_error_desc = desc;
-	ImGui::OpenPopup("ERROR");
-}
-
-void glfw_error_callback(int error, const char* description) {
-	fprintf(stderr, "GLFW Error %d: %s\n", error, description);
-	imgui_show_error(error, description);	
-}
-
-void glfw_framebuffer_size_callback(GLFWwindow* window, int width, int height) {
-	glViewport(0, 0, width, height);
-	glfw_window_width = width;
-	glfw_window_height = height;
-}
-
-void glfw_process_input(GLFWwindow* window) {
-	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-		glfwSetWindowShouldClose(window, true);
-	}
-}
-
-int midi_monitor_status = 0;
-int midi_monitor_channel = 0;
-int midi_monitor_byte2 = 0;
-int midi_monitor_byte3 = 0;
 void midi_monitor_callback(double deltatime, std::vector< unsigned char > *message, void *userData)
 {
 	midi_monitor_status = (int)message->at(0);
@@ -93,11 +70,34 @@ void midi_monitor_callback(double deltatime, std::vector< unsigned char > *messa
 	}
 }
 
-void imgui_midi_port_manager(RtMidiIn* midi_in) {
+void imgui_show_error(int code, const char* desc) {
+	glfw_current_error_code = code;
+	glfw_current_error_desc = desc;
+	ImGui::OpenPopup("ERROR");
+}
+
+void glfw_error_callback(int error, const char* description) {
+	fprintf(stderr, "GLFW Error %d: %s\n", error, description);
+	imgui_show_error(error, description);	
+}
+
+void glfw_framebuffer_size_callback(GLFWwindow* window, int width, int height) {
+	glViewport(0, 0, width, height);
+	glfw_window_width = width;
+	glfw_window_height = height;
+}
+
+void glfw_process_input(GLFWwindow* window) {
+	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+		glfwSetWindowShouldClose(window, true);
+	}
+}
+
+void imgui_midi_port_manager() {
 	static const char* combo_preview_available_midi_ports = available_midi_ports[available_midi_port_id].c_str();
 
 	if (ImGui::Button("Refresh") && midi_in->isPortOpen() == false) {
-		refresh_available_midi_ports(midi_in);
+		refresh_available_midi_ports();
 		combo_preview_available_midi_ports = available_midi_ports[0].c_str();
 	}
 
@@ -139,7 +139,7 @@ void imgui_midi_port_manager(RtMidiIn* midi_in) {
 	}
 }
 
-void imgui_midi_monitor(RtMidiIn* midi_in) {
+void imgui_midi_monitor() {
 	if (midi_in->isPortOpen()) {
 		if (midi_monitor_status >= MIDI_MSG_NOTE_OFF && midi_monitor_status < MIDI_MSG_NOTE_OFF + 16) {
 			ImGui::Text("Note Off\nChannel: %d\nNote: %d\nVelocity: %d", midi_monitor_channel, midi_monitor_byte2, midi_monitor_byte3);
@@ -156,9 +156,20 @@ void imgui_midi_monitor(RtMidiIn* midi_in) {
 	}
 }
 
+void imgui_error_popup() {
+	// error modal popup
+	if (ImGui::BeginPopupModal("ERROR", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+		ImGui::Text("GLFW Error %d: %s\n", glfw_current_error_code, glfw_current_error_desc.c_str());
+		if (ImGui::Button("Close")) {
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+}
+
 void app_setup_midi() {
 	midi_in = new RtMidiIn();
-	refresh_available_midi_ports(midi_in);
+	refresh_available_midi_ports();
 }
 
 int app_setup_glfw() {
@@ -202,7 +213,7 @@ void app_setup_imgui() {
 }
 
 int main() {
-	
+
 	app_setup_midi();
 	app_setup_glfw();
 	app_setup_imgui();
@@ -221,21 +232,14 @@ int main() {
 		ImGui::SetNextWindowSize(ImVec2(glfw_window_width, glfw_window_height));
 		ImGui::Begin("vJoy Midi Feeder", 0, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize);
 
-		imgui_midi_port_manager(midi_in);
-		imgui_midi_monitor(midi_in);
+		imgui_midi_port_manager();
+		imgui_midi_monitor();
 
 		/*if (ImGui::Button("Test Error")) {
 			imgui_show_error(420, "I'm freakin' out man!");
 		}*/
-
-		// error modal popup
-		if (ImGui::BeginPopupModal("ERROR", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-			ImGui::Text("GLFW Error %d: %s\n", glfw_current_error_code, glfw_current_error_desc.c_str());
-			if (ImGui::Button("Close")) {
-				ImGui::CloseCurrentPopup();
-			}
-			ImGui::EndPopup();
-		}
+		imgui_error_popup();
+		
 
 		ImGui::End();
 
