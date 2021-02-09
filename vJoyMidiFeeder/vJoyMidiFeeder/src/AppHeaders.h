@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <tchar.h>
 #include <windows.h>
+#include <chrono>
 
 #include "glad/glad.h"
 #include "GLFW/glfw3.h"
@@ -19,3 +20,5 @@
 #include "vjoyinterface.h"
 
 #include "RtMidi.h"
+
+typedef std::chrono::high_resolution_clock Clock;
