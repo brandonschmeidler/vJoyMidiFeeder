@@ -32,6 +32,7 @@ std::string glfw_current_error_desc = "";
 //int glfw_window_y = 0;
 int glfw_window_width = 800;
 int glfw_window_height = 600;
+const int MIDI_CC_CH1 = 176;
 
 std::vector<std::string> available_midi_ports;
 int available_midi_port_count = 0;
@@ -74,38 +75,22 @@ void glfw_process_input(GLFWwindow* window) {
 	}
 }
 
-void midi_demo_callback(double deltatime, std::vector< unsigned char > *message, void *userData)
+
+int midi_monitor_channel = 1;
+int midi_monitor_cc = 0;
+int midi_monitor_value = 0;
+void midi_monitor_callback(double deltatime, std::vector< unsigned char > *message, void *userData)
 {
 	unsigned int nBytes = message->size();
-	for (unsigned int i = 0; i < nBytes; i++)
+
+	midi_monitor_channel = (int)message->at(0) - MIDI_CC_CH1 + 1;
+	midi_monitor_cc = (int)message->at(1);
+	midi_monitor_value = (int)message->at(2);
+	/*for (unsigned int i = 0; i < nBytes; i++)
 		std::cout << "Byte " << i << " = " << (int)message->at(i) << ", ";
 	if (nBytes > 0)
-		std::cout << "stamp = " << deltatime << std::endl;
+		std::cout << "stamp = " << deltatime << std::endl;*/
 }
-//int midi_demo(RtMidiIn* midiin)
-//{
-//	//RtMidiIn *midiin = new RtMidiIn();
-//	// Check available ports.
-//	unsigned int nPorts = midiin->getPortCount();
-//	if (nPorts == 0) {
-//		std::cout << "No ports available!\n";
-//		goto cleanup;
-//	}
-//	midiin->openPort(0);
-//	// Set our callback function.  This should be done immediately after
-//	// opening the port to avoid having incoming messages written to the
-//	// queue.
-//	midiin->setCallback(&midi_demo_callback);
-//	// Don't ignore sysex, timing, or active sensing messages.
-//	midiin->ignoreTypes(false, false, false);
-//	std::cout << "\nReading MIDI input ... press <enter> to quit.\n";
-//	char input;
-//	std::cin.get(input);
-//	// Clean up
-//cleanup:
-//	delete midiin;
-//	return 0;
-//}
 
 
 
@@ -144,7 +129,7 @@ int main() {
 
 	ImGui::StyleColorsDark();
 
-	
+
 	//ImGuiStyle& style = ImGui::GetStyle();
 	//style.WindowRounding = 0.0f;
 	//style.Colors[ImGuiCol_WindowBg].w = 1.0f;
@@ -173,12 +158,12 @@ int main() {
 		ImGui::Begin("vJoy Midi Feeder", 0, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize);
 
 		static const char* preview_value = available_midi_ports[available_midi_port_id].c_str();
-		
+
 		if (ImGui::Button("Refresh")) {
 			refresh_available_midi_ports(midi_in);
 			preview_value = available_midi_ports[0].c_str();
 		}
-		
+
 		ImGui::SameLine();
 
 		ImGui::PushItemWidth(300.0f);
@@ -198,26 +183,30 @@ int main() {
 
 		ImGui::SameLine();
 		static bool midi_port_open = midi_in->isPortOpen();
-		//const char* label = midi_port_open ? "Turn Port Off" : "Turn Port On";
+		//const char* label = midi_port_open ? "Turn MIDI Port Off" : "Turn MIDI Port On";
 		const ImVec4 color = ImVec4(midi_port_open ? 0.0f : 1.0f, midi_port_open ? 1.0f : 0.0f, 0.0f, 1.0f);
 		const ImGuiColorEditFlags flags = ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_NoTooltip;
-		if (ImGui::ColorButton("Toggle Port", color, flags)) {
+		if (ImGui::ColorButton("##colorbutton_toggleport", color, flags)) {
 			if (midi_port_open) {
 				midi_in->cancelCallback();
 				midi_in->closePort();
 			}
 			else {
 				midi_in->openPort(available_midi_port_id);
-				midi_in->setCallback(&midi_demo_callback);
+				midi_in->setCallback(&midi_monitor_callback);
 			}
 			midi_port_open = midi_in->isPortOpen();
+		}
+
+		if (midi_port_open) {
+			ImGui::Text("Channel: %d\nCC: %d\nValue: %d", midi_monitor_channel, midi_monitor_cc, midi_monitor_value);
 		}
 
 
 		/*if (ImGui::Button("Test Error")) {
 			imgui_show_error(420, "I'm freakin' out man!");
 		}*/
-		
+
 		// error modal popup
 		if (ImGui::BeginPopupModal("ERROR", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
 			ImGui::Text("GLFW Error %d: %s\n", glfw_current_error_code, glfw_current_error_desc.c_str());
@@ -228,10 +217,10 @@ int main() {
 		}
 
 		ImGui::End();
-		
+
 		// ImGui drawing stops here
 		ImGui::Render();
-		
+
 		// OpenGL drawing starts here
 		glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
 		glClear(GL_COLOR_BUFFER_BIT);
@@ -244,13 +233,12 @@ int main() {
 		//glfwMakeContextCurrent(backup_current_context);
 
 		glfwSwapBuffers(window);
-
-
-		// process logic after rendering I guess. I'll probably change this
-		if (midi_port_open) {
-			
-		}
 	}
+
+	if (midi_in->isPortOpen()) {
+		midi_in->closePort();
+	}
+	delete midi_in;
 
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
