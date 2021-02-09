@@ -1,24 +1,42 @@
 #include "AppHeaders.h"
+#include <unordered_map>
 
 enum eAxis {
 	X, Y, Z, RX, RY, RZ, SL0, SL1
 };
 
-//bool app_running = true;
+struct MIDI_CC {
+	int channel;
+	int id;
 
-//float running_time = 0.0f;
-//float closing_time = 10.0f;
-//float frame_time = 0.0f;
-//const float max_frame_time = 1.0f / 60.0f; // 60fps
+	MIDI_CC() {
+		channel = 1;
+		id = 0;
+	}
 
-const int vjoy_device_id = 1;
-const int midi_device_id = 0;
+	MIDI_CC(int midi_channel, int cc) {
+		channel = midi_channel;
+		id = cc;
+	}
+};
+
+struct VJOYMIDI_BINDING {
+	int device_id;
+	MIDI_CC axes[8];
+};
+
+int vjoy_device_id = 1;
+int midi_device_id = 0;
 const int MIDI_MSG_CC = 176;
 const long max_value = 0x8000;
 
 BOOL used_axis_cache[8];
 
 JOYSTICK_POSITION_V2 iReport;
+VJOYMIDI_BINDING binding;
+eAxis axis_bind_type = eAxis::X;
+
+MIDI_CC last_midi_message;
 
 void cache_used_axes() {
 	used_axis_cache[eAxis::X] = GetVJDAxisExist(vjoy_device_id, HID_USAGE_X);
@@ -31,55 +49,27 @@ void cache_used_axes() {
 	used_axis_cache[eAxis::SL1] = GetVJDAxisExist(vjoy_device_id, HID_USAGE_SL1);
 }
 
-//void update() {
-//
-//	iReport.bDevice = (BYTE)vjoy_device_id;
-//
-//	long value = 0;
-//
-//	if (used_axis_cache[eAxis::X])
-//		iReport.wAxisX = value;
-//
-//	if (used_axis_cache[eAxis::Y])
-//		iReport.wAxisY = value;
-//
-//	if (used_axis_cache[eAxis::Z])
-//		iReport.wAxisZ = value;
-//
-//	if (used_axis_cache[eAxis::RX])
-//		iReport.wAxisXRot = value;
-//
-//	if (used_axis_cache[eAxis::RY])
-//		iReport.wAxisYRot = value;
-//
-//	if (used_axis_cache[eAxis::RZ])
-//		iReport.wAxisZRot = value;
-//
-//	if (used_axis_cache[eAxis::SL0])
-//		iReport.wSlider = value;
-//
-//	if (used_axis_cache[eAxis::SL1])
-//		iReport.wDial = value;
-//
-//	UpdateVJD(vjoy_device_id, (PVOID)(&iReport));
-//}
+void midi_bind_callback(double deltatime, std::vector<unsigned char>* message, void* userData) {
+	int status = (int)message->at(0);
+	if (status >= MIDI_MSG_CC && status < MIDI_MSG_CC + 16) {
+		int channel = status - MIDI_MSG_CC + 1;
+		int cc = (int)message->at(1);
+
+		MIDI_CC axis = binding.axes[axis_bind_type];
+		axis.channel = channel;
+		axis.id = cc;
+	}
+}
 
 void midi_monitor_callback(double deltatime, std::vector< unsigned char > *message, void *userData)
 {
-	unsigned int nBytes = message->size();
-	for (unsigned int i = 0; i < nBytes; i++)
-		std::cout << "Byte " << i << " = " << (int)message->at(i) << ", ";
-	if (nBytes > 0)
-		std::cout << "stamp = " << deltatime << std::endl;
-	
 	int status = (int)message->at(0);
 	if (status >= MIDI_MSG_CC && status < MIDI_MSG_CC + 16) {
 		int channel = status - MIDI_MSG_CC + 1;
 		int cc = (int)message->at(1);
 		int val = (int)message->at(2);
 
-
-
+		iReport.bDevice = vjoy_device_id;
 		iReport.wAxisX = (val / 128.0f) * max_value;
 
 		UpdateVJD(vjoy_device_id, (PVOID)(&iReport));
@@ -87,8 +77,72 @@ void midi_monitor_callback(double deltatime, std::vector< unsigned char > *messa
 
 }
 
+void clear_console() {
+	system("CLS");
+	printf("Vendor: %S\nProduct :%S\nVersion Number:%S\n", \
+		TEXT(GetvJoyManufacturerString()), \
+		TEXT(GetvJoyProductString()), \
+		TEXT(GetvJoySerialNumberString()));
+	printf("Acquired vJoy Device: %s \t Selected MIDI Device: %s\n", std::to_string(vjoy_device_id).c_str(), std::to_string(midi_device_id).c_str());
+}
+
+void show_existing_vjoy_devices() {
+	printf("\n\nExisting vJoy Devices (ID value): [ ");
+	for (int i = 0; i < 16; ++i) {
+		if (isVJDExists(i)) {
+			printf((std::string("\t") + std::to_string(i)).c_str());
+		}
+	}
+	printf("\t]\n\n");
+}
+
+void show_existing_midi_devices(RtMidiIn* midi_in) {
+	printf("\n\nExisting MIDI Devices (ID: Name): \n");
+	//unsigned int midi_device_count = midi_in->getPortCount();
+	for (unsigned int i = 0; i < midi_in->getPortCount(); ++i) {
+		std::string midi_device_name = midi_in->getPortName(i);
+		printf((std::to_string(i) + std::string("\t") + midi_device_name + std::string("\n")).c_str());
+	}
+	printf("\n");
+}
+
+int user_select_vjoy_device() {
+	show_existing_vjoy_devices();
+	printf("Choose a vJoy Device\n");
+
+	int vjoy_select_input;
+	std::cin >> vjoy_select_input;
+	if (isVJDExists(vjoy_select_input) && GetVJDStatus(vjoy_select_input) == VJD_STAT_FREE) {
+		vjoy_device_id = vjoy_select_input;
+		clear_console();
+		return 0;
+	}
+	else {
+		printf("vJoy Device #%d is disabled.\n", vjoy_select_input);
+		return -1;
+	}
+}
+
+int user_select_midi_device(RtMidiIn* midi_in) {
+	show_existing_vjoy_devices();
+	printf("Choose a MIDI Device\n");
+
+	int midi_select_input;
+	std::cin >> midi_select_input;
+	if (midi_select_input >= 0 && midi_select_input < midi_in->getPortCount()) {
+		midi_device_id = midi_select_input;
+		clear_console();
+		return 0;
+	}
+	else {
+		printf("That's not a valid MIDI device\n");
+		return -1;
+	}
+}
+
 int main() {
 	
+	// Setup midi device
 	RtMidiIn* midi_in = new RtMidiIn();
 	if (midi_in->getPortCount() == 0) {
 		printf("No MIDI devices available.\n\n");
@@ -108,10 +162,7 @@ int main() {
 		return -1;
 	}
 	else {
-		printf("Vendor: %S\nProduct :%S\nVersion Number:%S\n\n", \
-			TEXT(GetvJoyManufacturerString()), \
-			TEXT(GetvJoyProductString()), \
-			TEXT(GetvJoySerialNumberString()));
+		clear_console();
 	}
 
 	// Acquire vJoy device
@@ -126,32 +177,42 @@ int main() {
 	// Check what axes are used with this vJoy device
 	cache_used_axes();
 
-	//auto time_now = Clock::now();
-	//while (app_running) {
-
-	//	auto time_then = time_now;
-	//	time_now = Clock::now();
-
-	//	float dt = std::chrono::duration_cast<std::chrono::nanoseconds>(time_now - time_then).count() / 1000000000.0f;
-	//	running_time += dt;
-	//	
-	//	// Update around roughly 60 times per second
-	//	frame_time += dt;
-	//	if (frame_time >= max_frame_time) {
-	//		frame_time -= max_frame_time;
-	//		update();
-	//	}
-
-	//	if (running_time >= closing_time) { app_running = false; }
-
-	//}
-	printf("\nReading MIDI input ... press <enter> to quit.\n");
+UserInput:
+	printf(
+		"\n#\tFunction\n1\t%s\n2\t%s\nAwaiting input ... ",
+		"Select vJoy Device",
+		"Select MIDI Device"
+	);
 	char input;
-	std::cin.get(input);
+	std::cin >> input;
 
+	clear_console();
+	switch (input) {
+	case '1':
+		
+		while (user_select_vjoy_device() == -1) {}
 
+		goto UserInput;
+		break;
+	case '2':
+		show_existing_midi_devices(midi_in);
+
+		while (user_select_midi_device(midi_in) == -1) {}
+
+		goto UserInput;
+		break;
+	default:
+		printf("Good bye");
+		goto Cleanup;
+		break;
+	}
+	
+
+	// Cleanup 
+Cleanup:
 	RelinquishVJD(vjoy_device_id);
 	delete midi_in;
 
+	// Get outta heaaaa!
 	return 0;
 }

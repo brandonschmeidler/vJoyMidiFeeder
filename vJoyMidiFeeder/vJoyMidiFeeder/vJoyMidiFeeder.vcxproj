@@ -85,7 +85,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="src\MIDIManager.cpp" />
     <ClCompile Include="src\glad.c" />
     <ClCompile Include="src\imgui.cpp" />
     <ClCompile Include="src\imgui_demo.cpp" />
@@ -99,7 +98,6 @@
     <ClCompile Include="src\RtMidi.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="src\MIDIManager.h" />
     <ClInclude Include="src\AppHeaders.h" />
     <ClInclude Include="src\imconfig.h" />
     <ClInclude Include="src\imgui.h" />
