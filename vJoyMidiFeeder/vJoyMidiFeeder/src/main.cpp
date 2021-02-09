@@ -1,9 +1,14 @@
 #include "AppHeaders.h"
 
+const char* glsl_version = "#version 440";
+GLFWwindow* glfw_window = nullptr;
+ImVec4 glfw_window_bg_color = ImVec4(0.4f, 0.5f, 0.6f, 1.0f);
+
 const int MIDI_MSG_NOTE_OFF = 128;
 const int MIDI_MSG_NOTE_ON = 144;
 const int MIDI_MSG_CC = 176;
 const int MIDI_MSG_PC = 192;
+RtMidiIn* midi_in = nullptr;
 
 int glfw_current_error_code = 0;
 std::string glfw_current_error_desc = "";
@@ -15,6 +20,7 @@ int available_midi_port_count = 0;
 int available_midi_port_id = 0;
 
 void refresh_available_midi_ports(RtMidiIn* midi_in) {
+
 	available_midi_ports.clear();
 	available_midi_port_count = midi_in->getPortCount();
 	if (available_midi_port_count == 0) {
@@ -50,7 +56,6 @@ void glfw_process_input(GLFWwindow* window) {
 		glfwSetWindowShouldClose(window, true);
 	}
 }
-
 
 int midi_monitor_status = 0;
 int midi_monitor_channel = 0;
@@ -88,34 +93,96 @@ void midi_monitor_callback(double deltatime, std::vector< unsigned char > *messa
 	}
 }
 
+void imgui_midi_port_manager(RtMidiIn* midi_in) {
+	static const char* combo_preview_available_midi_ports = available_midi_ports[available_midi_port_id].c_str();
 
+	if (ImGui::Button("Refresh") && midi_in->isPortOpen() == false) {
+		refresh_available_midi_ports(midi_in);
+		combo_preview_available_midi_ports = available_midi_ports[0].c_str();
+	}
 
-int main() {
+	ImGui::SameLine();
 
-	RtMidiIn* midi_in = new RtMidiIn();
+	ImGui::PushItemWidth(300.0f);
+	if (ImGui::BeginCombo("##combo_midiports", combo_preview_available_midi_ports)) {
+
+		for (int i = 0; i < available_midi_port_count; ++i) {
+			bool is_selected = available_midi_port_id == i;
+			if (ImGui::Selectable(available_midi_ports[i].c_str(), is_selected)) {
+				if (midi_in->isPortOpen()) continue;
+				available_midi_port_id = i;
+				combo_preview_available_midi_ports = available_midi_ports[i].c_str();
+			}
+		}
+
+		ImGui::EndCombo();
+	}
+	ImGui::PopItemWidth();
+
+	ImGui::SameLine();
+	
+	if (available_midi_port_count > 0) {
+		bool midi_port_open = midi_in->isPortOpen();
+		const ImVec4 color = ImVec4(midi_port_open ? 0.0f : 1.0f, midi_port_open ? 1.0f : 0.0f, 0.0f, 1.0f);
+		const ImGuiColorEditFlags flags = ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_NoTooltip;
+		if (ImGui::ColorButton("##colorbutton_toggleport", color, flags)) {
+			if (midi_in->isPortOpen()) {
+				midi_in->cancelCallback();
+				midi_in->closePort();
+			}
+			else {
+				midi_in->openPort(available_midi_port_id);
+				midi_in->setCallback(&midi_monitor_callback);
+			}
+			//midi_port_open = midi_in->isPortOpen();
+		}
+	}
+}
+
+void imgui_midi_monitor(RtMidiIn* midi_in) {
+	if (midi_in->isPortOpen()) {
+		if (midi_monitor_status >= MIDI_MSG_NOTE_OFF && midi_monitor_status < MIDI_MSG_NOTE_OFF + 16) {
+			ImGui::Text("Note Off\nChannel: %d\nNote: %d\nVelocity: %d", midi_monitor_channel, midi_monitor_byte2, midi_monitor_byte3);
+		}
+		else if (midi_monitor_status >= MIDI_MSG_NOTE_ON && midi_monitor_status < MIDI_MSG_NOTE_ON + 16) {
+			ImGui::Text("Note On\nChannel: %d\nNote: %d\nVelocity: %d", midi_monitor_channel, midi_monitor_byte2, midi_monitor_byte3);
+		}
+		else if (midi_monitor_status >= MIDI_MSG_CC && midi_monitor_status < MIDI_MSG_CC + 16) {
+			ImGui::Text("Control Change\nChannel: %d\nCC: %d\nValue: %d", midi_monitor_channel, midi_monitor_byte2, midi_monitor_byte3);
+		}
+		else if (midi_monitor_status >= MIDI_MSG_PC && midi_monitor_status < MIDI_MSG_PC + 16) {
+			ImGui::Text("Program Change\nChannel: %d\nPC: %d", midi_monitor_channel, midi_monitor_byte2);
+		}
+	}
+}
+
+void app_setup_midi() {
+	midi_in = new RtMidiIn();
 	refresh_available_midi_ports(midi_in);
+}
 
+int app_setup_glfw() {
 	glfwSetErrorCallback(glfw_error_callback);
 
 	if (!glfwInit()) { return -1; }
 
-	const char* glsl_version = "#version 440";
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
 	glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-	GLFWwindow* window = glfwCreateWindow(800, 600, "vJoy Midi Feeder v0.0.0", nullptr, nullptr);
-	if (!window) { return -1; }
+	glfw_window = glfwCreateWindow(800, 600, "vJoy Midi Feeder v0.0.0", nullptr, nullptr);
+	if (!glfw_window) { return -1; }
 
-	glfwMakeContextCurrent(window);
+	glfwMakeContextCurrent(glfw_window);
 	glfwSwapInterval(1); // enable vsync. might not need this.
 
 	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress)) { return -1; }
 
-	glViewport(0, 0, glfw_window_width, glfw_window_height);
+	glfwSetFramebufferSizeCallback(glfw_window, glfw_framebuffer_size_callback);
+	return 0;
+}
 
-	glfwSetFramebufferSizeCallback(window, glfw_framebuffer_size_callback);
-
+void app_setup_imgui() {
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO(); (void)io;
@@ -130,15 +197,18 @@ int main() {
 	//style.WindowRounding = 0.0f;
 	//style.Colors[ImGuiCol_WindowBg].w = 1.0f;
 
-	ImGui_ImplGlfw_InitForOpenGL(window, true);
+	ImGui_ImplGlfw_InitForOpenGL(glfw_window, true);
 	ImGui_ImplOpenGL3_Init(glsl_version);
+}
 
-	bool show_demo_window = true;
-	bool show_another_window = false;
-	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.6f, 1.0f);
+int main() {
+	
+	app_setup_midi();
+	app_setup_glfw();
+	app_setup_imgui();
 
-	while (!glfwWindowShouldClose(window)) {
-		glfw_process_input(window);
+	while (!glfwWindowShouldClose(glfw_window)) {
+		glfw_process_input(glfw_window);
 		glfwPollEvents();
 
 		ImGui_ImplOpenGL3_NewFrame();
@@ -146,66 +216,13 @@ int main() {
 		ImGui::NewFrame();
 
 		// ImGui drawing starts here
-		//glfwGetWindowPos(window, &glfw_window_x, &glfw_window_y);
-		//ImGui::SetNextWindowPos(ImVec2(glfw_window_x, glfw_window_y));
 		ImGui::SetNextWindowPos(ImVec2(0, 0));
-		glfwGetWindowSize(window, &glfw_window_width, &glfw_window_height);
+		glfwGetWindowSize(glfw_window, &glfw_window_width, &glfw_window_height);
 		ImGui::SetNextWindowSize(ImVec2(glfw_window_width, glfw_window_height));
 		ImGui::Begin("vJoy Midi Feeder", 0, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize);
 
-		static const char* preview_value = available_midi_ports[available_midi_port_id].c_str();
-
-		if (ImGui::Button("Refresh")) {
-			refresh_available_midi_ports(midi_in);
-			preview_value = available_midi_ports[0].c_str();
-		}
-
-		ImGui::SameLine();
-
-		ImGui::PushItemWidth(300.0f);
-		if (ImGui::BeginCombo("##combo_midiports", preview_value)) {
-
-			for (int i = 0; i < available_midi_port_count; ++i) {
-				bool is_selected = available_midi_port_id == i;
-				if (ImGui::Selectable(available_midi_ports[i].c_str(), is_selected)) {
-					available_midi_port_id = i;
-					preview_value = available_midi_ports[i].c_str();
-				}
-			}
-
-			ImGui::EndCombo();
-		}
-		ImGui::PopItemWidth();
-
-		ImGui::SameLine();
-		static bool midi_port_open = midi_in->isPortOpen();
-		//const char* label = midi_port_open ? "Turn MIDI Port Off" : "Turn MIDI Port On";
-		const ImVec4 color = ImVec4(midi_port_open ? 0.0f : 1.0f, midi_port_open ? 1.0f : 0.0f, 0.0f, 1.0f);
-		const ImGuiColorEditFlags flags = ImGuiColorEditFlags_NoPicker | ImGuiColorEditFlags_NoTooltip;
-		if (ImGui::ColorButton("##colorbutton_toggleport", color, flags)) {
-			if (midi_port_open) {
-				midi_in->cancelCallback();
-				midi_in->closePort();
-			}
-			else {
-				midi_in->openPort(available_midi_port_id);
-				midi_in->setCallback(&midi_monitor_callback);
-			}
-			midi_port_open = midi_in->isPortOpen();
-		}
-
-		if (midi_port_open) {
-			if (midi_monitor_status >= MIDI_MSG_NOTE_OFF && midi_monitor_status < MIDI_MSG_NOTE_OFF + 16) {
-				ImGui::Text("Note Off\nChannel: %d\nNote: %d\nVelocity: %d", midi_monitor_channel, midi_monitor_byte2, midi_monitor_byte3);
-			} else if (midi_monitor_status >= MIDI_MSG_NOTE_ON && midi_monitor_status < MIDI_MSG_NOTE_ON + 16) {
-				ImGui::Text("Note On\nChannel: %d\nNote: %d\nVelocity: %d", midi_monitor_channel, midi_monitor_byte2, midi_monitor_byte3);
-			} else if (midi_monitor_status >= MIDI_MSG_CC && midi_monitor_status < MIDI_MSG_CC + 16) {
-				ImGui::Text("Control Change\nChannel: %d\nCC: %d\nValue: %d", midi_monitor_channel, midi_monitor_byte2, midi_monitor_byte3);
-			} else if (midi_monitor_status >= MIDI_MSG_PC && midi_monitor_status < MIDI_MSG_PC + 16) {
-				ImGui::Text("Program Change\nChannel: %d\nPC: %d", midi_monitor_channel, midi_monitor_byte2);
-			}
-		}
-
+		imgui_midi_port_manager(midi_in);
+		imgui_midi_monitor(midi_in);
 
 		/*if (ImGui::Button("Test Error")) {
 			imgui_show_error(420, "I'm freakin' out man!");
@@ -226,7 +243,7 @@ int main() {
 		ImGui::Render();
 
 		// OpenGL drawing starts here
-		glClearColor(clear_color.x, clear_color.y, clear_color.z, clear_color.w);
+		glClearColor(glfw_window_bg_color.x, glfw_window_bg_color.y, glfw_window_bg_color.z, glfw_window_bg_color.w);
 		glClear(GL_COLOR_BUFFER_BIT);
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
@@ -236,7 +253,7 @@ int main() {
 		//ImGui::RenderPlatformWindowsDefault();
 		//glfwMakeContextCurrent(backup_current_context);
 
-		glfwSwapBuffers(window);
+		glfwSwapBuffers(glfw_window);
 	}
 
 	if (midi_in->isPortOpen()) {
@@ -247,7 +264,7 @@ int main() {
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplGlfw_Shutdown();
 	ImGui::DestroyContext();
-	glfwDestroyWindow(window);
+	glfwDestroyWindow(glfw_window);
 
 	glfwTerminate();
 	return 0;
