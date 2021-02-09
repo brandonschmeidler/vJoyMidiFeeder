@@ -1,38 +1,14 @@
 #include "AppHeaders.h"
 
-namespace ImGui
-{
-	static auto vector_getter = [](void* vec, int idx, const char** out_text)
-	{
-		auto& vector = *static_cast<std::vector<std::string>*>(vec);
-		if (idx < 0 || idx >= static_cast<int>(vector.size())) { return false; }
-		*out_text = vector.at(idx).c_str();
-		return true;
-	};
-
-	bool Combo(const char* label, int* currIndex, std::vector<std::string>& values)
-	{
-		if (values.empty()) { return false; }
-		return Combo(label, currIndex, vector_getter,
-			static_cast<void*>(&values), values.size());
-	}
-
-	bool ListBox(const char* label, int* currIndex, std::vector<std::string>& values)
-	{
-		if (values.empty()) { return false; }
-		return ListBox(label, currIndex, vector_getter,
-			static_cast<void*>(&values), values.size());
-	}
-
-}
+const int MIDI_MSG_NOTE_OFF = 128;
+const int MIDI_MSG_NOTE_ON = 144;
+const int MIDI_MSG_CC = 176;
+const int MIDI_MSG_PC = 192;
 
 int glfw_current_error_code = 0;
 std::string glfw_current_error_desc = "";
-//int glfw_window_x = 0;
-//int glfw_window_y = 0;
 int glfw_window_width = 800;
 int glfw_window_height = 600;
-const int MIDI_CC_CH1 = 176;
 
 std::vector<std::string> available_midi_ports;
 int available_midi_port_count = 0;
@@ -76,20 +52,40 @@ void glfw_process_input(GLFWwindow* window) {
 }
 
 
-int midi_monitor_channel = 1;
-int midi_monitor_cc = 0;
-int midi_monitor_value = 0;
+int midi_monitor_status = 0;
+int midi_monitor_channel = 0;
+int midi_monitor_byte2 = 0;
+int midi_monitor_byte3 = 0;
 void midi_monitor_callback(double deltatime, std::vector< unsigned char > *message, void *userData)
 {
-	unsigned int nBytes = message->size();
+	midi_monitor_status = (int)message->at(0);
 
-	midi_monitor_channel = (int)message->at(0) - MIDI_CC_CH1 + 1;
-	midi_monitor_cc = (int)message->at(1);
-	midi_monitor_value = (int)message->at(2);
-	/*for (unsigned int i = 0; i < nBytes; i++)
-		std::cout << "Byte " << i << " = " << (int)message->at(i) << ", ";
-	if (nBytes > 0)
-		std::cout << "stamp = " << deltatime << std::endl;*/
+	if (midi_monitor_status >= MIDI_MSG_NOTE_OFF && midi_monitor_status < MIDI_MSG_NOTE_OFF + 16) {
+		midi_monitor_channel = midi_monitor_status - MIDI_MSG_NOTE_OFF + 1;
+		midi_monitor_byte2 = (int)message->at(1); // key number
+		midi_monitor_byte3 = (int)message->at(2); // velocity
+		return;
+	}
+
+	if (midi_monitor_status >= MIDI_MSG_NOTE_ON && midi_monitor_status < MIDI_MSG_NOTE_ON + 16) {
+		midi_monitor_channel = midi_monitor_status - MIDI_MSG_NOTE_ON + 1;
+		midi_monitor_byte2 = (int)message->at(1); // key number
+		midi_monitor_byte3 = (int)message->at(2); // velocity
+		return;
+	}
+
+	if (midi_monitor_status >= MIDI_MSG_CC && midi_monitor_status < MIDI_MSG_CC + 16) {
+		midi_monitor_channel = midi_monitor_status - MIDI_MSG_CC + 1;
+		midi_monitor_byte2 = (int)message->at(1); // cc id
+		midi_monitor_byte3 = (int)message->at(2); // cc value
+		return;
+	}
+
+	if (midi_monitor_status >= MIDI_MSG_PC && midi_monitor_status < MIDI_MSG_PC + 16) {
+		midi_monitor_channel = midi_monitor_status - MIDI_MSG_PC + 1;
+		midi_monitor_byte2 = (int)message->at(1); // program number
+		return;
+	}
 }
 
 
@@ -199,7 +195,15 @@ int main() {
 		}
 
 		if (midi_port_open) {
-			ImGui::Text("Channel: %d\nCC: %d\nValue: %d", midi_monitor_channel, midi_monitor_cc, midi_monitor_value);
+			if (midi_monitor_status >= MIDI_MSG_NOTE_OFF && midi_monitor_status < MIDI_MSG_NOTE_OFF + 16) {
+				ImGui::Text("Note Off\nChannel: %d\nNote: %d\nVelocity: %d", midi_monitor_channel, midi_monitor_byte2, midi_monitor_byte3);
+			} else if (midi_monitor_status >= MIDI_MSG_NOTE_ON && midi_monitor_status < MIDI_MSG_NOTE_ON + 16) {
+				ImGui::Text("Note On\nChannel: %d\nNote: %d\nVelocity: %d", midi_monitor_channel, midi_monitor_byte2, midi_monitor_byte3);
+			} else if (midi_monitor_status >= MIDI_MSG_CC && midi_monitor_status < MIDI_MSG_CC + 16) {
+				ImGui::Text("Control Change\nChannel: %d\nCC: %d\nValue: %d", midi_monitor_channel, midi_monitor_byte2, midi_monitor_byte3);
+			} else if (midi_monitor_status >= MIDI_MSG_PC && midi_monitor_status < MIDI_MSG_PC + 16) {
+				ImGui::Text("Program Change\nChannel: %d\nPC: %d", midi_monitor_channel, midi_monitor_byte2);
+			}
 		}
 
 
