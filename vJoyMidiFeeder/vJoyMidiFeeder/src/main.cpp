@@ -9,6 +9,11 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
+#include <tchar.h>
+#include <Windows.h>
+#include "public.h"
+#include "vjoyinterface.h"
+
 #pragma region ImGui Functions
 void imgui_new_frame() {
 	ImGui_ImplOpenGL3_NewFrame();
@@ -46,15 +51,11 @@ void gui_dock_initial_layout(GLFWwindow* window, ImGuiID dockspace_id) {
 
 	ImGuiID dock_main_id = dockspace_id;
 	
-	ImGuiID dock_id_prop_top = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Left, 0.20f, nullptr, &dock_main_id);
-	//ImGuiID dock_id_prop_bottom = ImGui::DockBuilderSplitNode(dock_id_prop_top, ImGuiDir_Down, 0.5f, nullptr, &dock_id_prop_top);
+	ImGuiID dock_id_left = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Left, 0.20f, nullptr, &dock_main_id);
 	ImGuiID dock_id_bottom = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Down, 0.20f, nullptr, &dock_main_id);
 	
-	ImGuiDockNode* dock_node = ImGui::DockBuilderGetNode(dock_id_prop_top);
+	ImGuiDockNode* dock_node = ImGui::DockBuilderGetNode(dock_id_left);
 	dock_node->LocalFlags |= ImGuiDockNodeFlags_NoWindowMenuButton | ImGuiDockNodeFlags_NoCloseButton;
-
-	//dock_node = ImGui::DockBuilderGetNode(dock_id_prop_bottom);
-	//dock_node->LocalFlags |= ImGuiDockNodeFlags_NoWindowMenuButton | ImGuiDockNodeFlags_NoCloseButton;
 
 	dock_node = ImGui::DockBuilderGetNode(dock_id_bottom);
 	dock_node->LocalFlags |= ImGuiDockNodeFlags_NoWindowMenuButton | ImGuiDockNodeFlags_NoCloseButton;
@@ -62,20 +63,30 @@ void gui_dock_initial_layout(GLFWwindow* window, ImGuiID dockspace_id) {
 	dock_node = ImGui::DockBuilderGetNode(dock_main_id);
 	dock_node->LocalFlags |= ImGuiDockNodeFlags_NoWindowMenuButton | ImGuiDockNodeFlags_NoCloseButton | ImGuiDockNodeFlags_NoTabBar;
 
-	ImGui::DockBuilderDockWindow("Device Manager", dock_id_prop_top);
-	//ImGui::DockBuilderDockWindow("MIDI Devices", dock_id_prop_top);
-	//ImGui::DockBuilderDockWindow("vJoy Devices", dock_id_prop_bottom);
-	ImGui::DockBuilderDockWindow("MIDI Monitor", dock_id_bottom);
-	ImGui::DockBuilderDockWindow("Input Binder", dock_main_id);
+	ImGui::DockBuilderDockWindow("Device Manager", dock_id_left);
+	ImGui::DockBuilderDockWindow("MIDI Message Monitor", dock_id_bottom);
+	ImGui::DockBuilderDockWindow("vJoy Device Monitor", dock_main_id);
 	ImGui::DockBuilderFinish(dockspace_id);
 	ran_already = true;
 }
 
-void gui_input_binder() {
-	ImGui::Begin("Input Binder", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar);
-	for (int i = 0; i < 10; ++i) {
-		ImGui::Text("Bindy %d", i);
+void gui_vjoy_device_monitor() {
+	ImGui::Begin("vJoy Device Monitor", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar);
+
+	float t = fabsf(sinf(glfwGetTime()));
+	int axis = t * 0x8000;
+
+	if (ImGui::TreeNode("Bindings")) {
+		
+		if (ImGui::TreeNode("Axis X")) {
+			ImGui::Text("Channel: %d\tCC: %d", 1, 86);
+			ImGui::SameLine(); 
+			ImGui::Button("+##bind_xaxis");
+			ImGui::TreePop();
+		}
+		ImGui::TreePop();
 	}
+
 	ImGui::End();
 }
 
@@ -85,6 +96,8 @@ void gui_devices_midi() {
 	for (int i = 0; i < 5; ++i) fake_midi_devices.push_back(std::string("MIDI ") + std::to_string(i));
 	static int selected_midi_id = 0;
 	ImGui::Text("MIDI Devices");
+	ImGui::SameLine();
+	ImGui::Button("Refresh##midi_devices");
 
 	ImVec2 region = ImGui::GetContentRegionAvail();
 	ImGui::PushItemWidth(region.x);
@@ -111,6 +124,8 @@ void gui_devices_vjoy() {
 
 	static int selected_vjoy_id = 0;
 	ImGui::Text("vJoy Devices");
+	ImGui::SameLine();
+	ImGui::Button("Refresh##vjoy_devices");
 
 	ImVec2 region = ImGui::GetContentRegionAvail();
 	ImGui::PushItemWidth(region.x);
@@ -126,7 +141,7 @@ void gui_devices_vjoy() {
 		}
 		ImGui::EndCombo();
 	}
-
+	
 	ImGui::PopItemWidth();
 }
 
@@ -140,7 +155,7 @@ void gui_device_manager() {
 }
 
 void gui_midi_monitor() {
-	ImGui::Begin("MIDI Monitor", nullptr, ImGuiWindowFlags_NoMove);
+	ImGui::Begin("MIDI Message Monitor", nullptr, ImGuiWindowFlags_NoMove);
 	for (int i = 0; i < 10; ++i) {
 		ImGui::Text("Channel: %d\tCC: %d\tValue:%d", 1, i + 25, i * 10);
 	}
@@ -193,10 +208,8 @@ int main() {
 		ImGuiID dockspace_id = ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
 		gui_dock_initial_layout(window,dockspace_id);
 
-		gui_input_binder();
+		gui_vjoy_device_monitor();
 		gui_device_manager();
-		//gui_devices_midi();
-		//gui_devices_vjoy();
 		gui_midi_monitor();
 
 		ImGui::Render();
