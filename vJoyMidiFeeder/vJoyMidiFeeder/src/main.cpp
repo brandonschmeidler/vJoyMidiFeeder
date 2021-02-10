@@ -108,52 +108,72 @@ void gui_vjoy_device_monitor() {
 
 	if (ImGui::TreeNode("Bindings")) {
 
-		if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_X) > 0) {
-			if (gui_tree_bind_axis("Axis X", 1, 86)) {
-				printf("Binding X-Axis");
+		if (ImGui::TreeNode("Axes")) {
+			
+			if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_X) > 0) {
+				if (gui_tree_bind_axis("Axis X", 1, 86)) {
+					printf("Binding X-Axis");
+				}
 			}
+
+			if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_Y) > 0) {
+				if (gui_tree_bind_axis("Axis Y", 1, 86)) {
+					printf("Binding Y-Axis");
+				}
+			}
+
+			if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_Z) > 0) {
+				if (gui_tree_bind_axis("Axis Z", 1, 86)) {
+					printf("Binding Z-Axis");
+				}
+			}
+
+			if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_RX) > 0) {
+				if (gui_tree_bind_axis("Axis RX", 1, 86)) {
+					printf("Binding RX-Axis");
+				}
+			}
+
+			if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_RY) > 0) {
+				if (gui_tree_bind_axis("Axis RY", 1, 86)) {
+					printf("Binding RY-Axis");
+				}
+			}
+
+			if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_RZ) > 0) {
+				if (gui_tree_bind_axis("Axis RZ", 1, 86)) {
+					printf("Binding RZ-Axis");
+				}
+			}
+
+			if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_SL0) > 0) {
+				if (gui_tree_bind_axis("Axis SL0", 1, 86)) {
+					printf("Binding SL0-Axis");
+				}
+			}
+
+			if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_SL1) > 0) {
+				if (gui_tree_bind_axis("Axis SL1", 1, 86)) {
+					printf("Binding SL1-Axis");
+				}
+			}
+
+			ImGui::TreePop();
 		}
 
-		if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_Y) > 0) {
-			if (gui_tree_bind_axis("Axis Y", 1, 86)) {
-				printf("Binding Y-Axis");
+		if (ImGui::TreeNode("Buttons")) {
+			int button_count = GetVJDButtonNumber(selected_vjoy_device);
+			if (button_count > 0) {
+				for (int i = 0; i < button_count; ++i) {
+					if (ImGui::TreeNode(std::to_string(i).c_str())) {
+						ImGui::Text("Channel: %d\tCC: %d", 1, 86);
+						ImGui::SameLine();
+						ImGui::Button((std::string("Bind##button") + std::to_string(i)).c_str());
+						ImGui::TreePop();
+					}
+				}
 			}
-		}
-		
-		if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_Z) > 0) {
-			if (gui_tree_bind_axis("Axis Z", 1, 86)) {
-				printf("Binding Z-Axis");
-			}
-		}
-		
-		if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_RX) > 0) {
-			if (gui_tree_bind_axis("Axis RX", 1, 86)) {
-				printf("Binding RX-Axis");
-			}
-		}
-
-		if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_RY) > 0) {
-			if (gui_tree_bind_axis("Axis RY", 1, 86)) {
-				printf("Binding RY-Axis");
-			}
-		}
-
-		if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_RZ) > 0) {
-			if (gui_tree_bind_axis("Axis RZ", 1, 86)) {
-				printf("Binding RZ-Axis");
-			}
-		}
-
-		if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_SL0) > 0) {
-			if (gui_tree_bind_axis("Axis SL0", 1, 86)) {
-				printf("Binding SL0-Axis");
-			}
-		}
-
-		if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_SL1) > 0) {
-			if (gui_tree_bind_axis("Axis SL1", 1, 86)) {
-				printf("Binding SL1-Axis");
-			}
+			ImGui::TreePop();
 		}
 
 		ImGui::TreePop();
