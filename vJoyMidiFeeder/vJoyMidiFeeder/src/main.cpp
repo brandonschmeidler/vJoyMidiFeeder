@@ -14,6 +14,8 @@
 #include "public.h"
 #include "vjoyinterface.h"
 
+#include "RtMidi.h"
+
 #pragma region ImGui Functions
 void imgui_new_frame() {
 	ImGui_ImplOpenGL3_NewFrame();
@@ -32,6 +34,26 @@ static void glfw_framebuffer_size_callback(GLFWwindow* window, int width, int he
 const std::string APP_TITLE = "vJoy MIDI Feeder";
 const std::string APP_VERSION = "0.0.0";
 const char* GLSL_VERSION = "#version 440";
+
+int selected_vjoy_device = 1;
+#pragma endregion
+
+#pragma region MIDI Variables
+
+#pragma endregion
+
+#pragma region vJoy Variables
+std::vector<int> get_available_vjoy_devices() {
+	std::vector<int> devices;
+
+	for (int i = 0; i < 16; ++i) {
+		if (isVJDExists(i)) {
+			devices.push_back(i);
+		}
+	}
+
+	return devices;
+}
 #pragma endregion
 
 
@@ -70,20 +92,70 @@ void gui_dock_initial_layout(GLFWwindow* window, ImGuiID dockspace_id) {
 	ran_already = true;
 }
 
+bool gui_tree_bind_axis(const char* label, int channel, int cc) {
+	bool ret = false;
+	if (ImGui::TreeNode(label)) {
+		ImGui::Text("Channel: %d\tCC: %d", channel, cc);
+		ImGui::SameLine();
+		ret = ImGui::Button((std::string("Bind##") + std::string(label)).c_str());
+		ImGui::TreePop();
+	}
+	return ret;
+}
+
 void gui_vjoy_device_monitor() {
 	ImGui::Begin("vJoy Device Monitor", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar);
 
-	float t = fabsf(sinf(glfwGetTime()));
-	int axis = t * 0x8000;
-
 	if (ImGui::TreeNode("Bindings")) {
-		
-		if (ImGui::TreeNode("Axis X")) {
-			ImGui::Text("Channel: %d\tCC: %d", 1, 86);
-			ImGui::SameLine(); 
-			ImGui::Button("+##bind_xaxis");
-			ImGui::TreePop();
+
+		if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_X) > 0) {
+			if (gui_tree_bind_axis("Axis X", 1, 86)) {
+				printf("Binding X-Axis");
+			}
 		}
+
+		if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_Y) > 0) {
+			if (gui_tree_bind_axis("Axis Y", 1, 86)) {
+				printf("Binding Y-Axis");
+			}
+		}
+		
+		if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_Z) > 0) {
+			if (gui_tree_bind_axis("Axis Z", 1, 86)) {
+				printf("Binding Z-Axis");
+			}
+		}
+		
+		if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_RX) > 0) {
+			if (gui_tree_bind_axis("Axis RX", 1, 86)) {
+				printf("Binding RX-Axis");
+			}
+		}
+
+		if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_RY) > 0) {
+			if (gui_tree_bind_axis("Axis RY", 1, 86)) {
+				printf("Binding RY-Axis");
+			}
+		}
+
+		if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_RZ) > 0) {
+			if (gui_tree_bind_axis("Axis RZ", 1, 86)) {
+				printf("Binding RZ-Axis");
+			}
+		}
+
+		if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_SL0) > 0) {
+			if (gui_tree_bind_axis("Axis SL0", 1, 86)) {
+				printf("Binding SL0-Axis");
+			}
+		}
+
+		if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_SL1) > 0) {
+			if (gui_tree_bind_axis("Axis SL1", 1, 86)) {
+				printf("Binding SL1-Axis");
+			}
+		}
+
 		ImGui::TreePop();
 	}
 
@@ -118,24 +190,22 @@ void gui_devices_midi() {
 }
 
 void gui_devices_vjoy() {
-	std::vector<std::string> fake_vjoy_devices;
+	std::vector<int> vjoy_devices = get_available_vjoy_devices();
 
-	for (int i = 0; i < 5; ++i) fake_vjoy_devices.push_back(std::string("VJOY ") + std::to_string(i + 1));
-
-	static int selected_vjoy_id = 0;
 	ImGui::Text("vJoy Devices");
-	ImGui::SameLine();
-	ImGui::Button("Refresh##vjoy_devices");
 
 	ImVec2 region = ImGui::GetContentRegionAvail();
 	ImGui::PushItemWidth(region.x);
 
-	if (ImGui::BeginCombo("##combo_vJoyDevices", fake_vjoy_devices[selected_vjoy_id].c_str())) {
+	static int combo_index = 0;
+	if (ImGui::BeginCombo("##combo_vJoyDevices", std::to_string(vjoy_devices[combo_index]).c_str())) {
 
-		for (int i = 0; i < 5; ++i) {
-			bool is_selected = selected_vjoy_id == i;
-			if (ImGui::Selectable(fake_vjoy_devices[i].c_str(), is_selected)) {
-				selected_vjoy_id = i;
+		int count = vjoy_devices.size();
+		for (int i = 0; i < count; ++i) {
+			bool is_selected = combo_index == i;
+			if (ImGui::Selectable(std::to_string(vjoy_devices[i]).c_str(), is_selected)) {
+				combo_index = i;
+				selected_vjoy_device = vjoy_devices[i];
 				break;
 			}
 		}
@@ -166,6 +236,13 @@ void gui_midi_monitor() {
 
 
 int main() {
+
+#pragma region vJoy Setup
+	if (!vJoyEnabled()) {
+		printf("vJoy is disabled.\n\n");
+		return 1;
+	}
+#pragma endregion
 
 #pragma region Window/OpenGL Setup
 	glfwInit();
