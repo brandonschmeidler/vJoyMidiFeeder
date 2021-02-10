@@ -36,10 +36,24 @@ const std::string APP_VERSION = "0.0.0";
 const char* GLSL_VERSION = "#version 440";
 
 int selected_vjoy_device = 1;
+std::string selected_midi_device = "None";
 #pragma endregion
 
 #pragma region MIDI Variables
+std::vector<std::string> get_available_midi_devices(RtMidiIn* midi_in) {
+	std::vector<std::string> midi_ports;
+	int port_count = midi_in->getPortCount();
+	if (port_count == 0) {
+		midi_ports.push_back("No MIDI devices found.");
+	}
+	else {
+		for (int i = 0; i < port_count; ++i) {
+			midi_ports.push_back(midi_in->getPortName(i));
+		}
+	}
 
+	return midi_ports;
+}
 #pragma endregion
 
 #pragma region vJoy Variables
@@ -83,19 +97,24 @@ void gui_dock_initial_layout(GLFWwindow* window, ImGuiID dockspace_id) {
 	dock_node->LocalFlags |= ImGuiDockNodeFlags_NoWindowMenuButton | ImGuiDockNodeFlags_NoCloseButton;
 
 	dock_node = ImGui::DockBuilderGetNode(dock_main_id);
-	dock_node->LocalFlags |= ImGuiDockNodeFlags_NoWindowMenuButton | ImGuiDockNodeFlags_NoCloseButton | ImGuiDockNodeFlags_NoTabBar;
+	dock_node->LocalFlags |= ImGuiDockNodeFlags_NoWindowMenuButton | ImGuiDockNodeFlags_NoCloseButton;
 
 	ImGui::DockBuilderDockWindow("Device Manager", dock_id_left);
 	ImGui::DockBuilderDockWindow("MIDI Message Monitor", dock_id_bottom);
-	ImGui::DockBuilderDockWindow("vJoy Device Monitor", dock_main_id);
+	ImGui::DockBuilderDockWindow("vJoy Device Viewer", dock_main_id);
 	ImGui::DockBuilderFinish(dockspace_id);
 	ran_already = true;
 }
 
-bool gui_tree_bind_axis(const char* label, int channel, int cc) {
+void gui_text_midi_binding(const char* device, int channel, int cc) {
+	ImGui::Text("Device: %s\tChannel: %d\tCC: %d", device, channel, cc);
+}
+
+bool gui_tree_bind_axis(const char* label, const char* device, int channel, int cc) {
 	bool ret = false;
 	if (ImGui::TreeNode(label)) {
-		ImGui::Text("Channel: %d\tCC: %d", channel, cc);
+		//ImGui::Text("Channel: %d\tCC: %d", channel, cc);
+		gui_text_midi_binding(device, channel, cc);
 		ImGui::SameLine();
 		ret = ImGui::Button((std::string("Bind##") + std::string(label)).c_str());
 		ImGui::TreePop();
@@ -103,57 +122,57 @@ bool gui_tree_bind_axis(const char* label, int channel, int cc) {
 	return ret;
 }
 
-void gui_vjoy_device_monitor() {
-	ImGui::Begin("vJoy Device Monitor", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar);
+void gui_vjoy_device_viewer() {
+	ImGui::Begin("vJoy Device Viewer", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar);
 
 	if (ImGui::TreeNode("Bindings")) {
 
 		if (ImGui::TreeNode("Axes")) {
 			
 			if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_X) > 0) {
-				if (gui_tree_bind_axis("Axis X", 1, 86)) {
+				if (gui_tree_bind_axis("Axis X", selected_midi_device.c_str(), 1, 86)) {
 					printf("Binding X-Axis");
 				}
 			}
 
 			if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_Y) > 0) {
-				if (gui_tree_bind_axis("Axis Y", 1, 86)) {
+				if (gui_tree_bind_axis("Axis Y", selected_midi_device.c_str(), 1, 86)) {
 					printf("Binding Y-Axis");
 				}
 			}
 
 			if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_Z) > 0) {
-				if (gui_tree_bind_axis("Axis Z", 1, 86)) {
+				if (gui_tree_bind_axis("Axis Z", selected_midi_device.c_str(), 1, 86)) {
 					printf("Binding Z-Axis");
 				}
 			}
 
 			if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_RX) > 0) {
-				if (gui_tree_bind_axis("Axis RX", 1, 86)) {
+				if (gui_tree_bind_axis("Axis RX", selected_midi_device.c_str(), 1, 86)) {
 					printf("Binding RX-Axis");
 				}
 			}
 
 			if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_RY) > 0) {
-				if (gui_tree_bind_axis("Axis RY", 1, 86)) {
+				if (gui_tree_bind_axis("Axis RY", selected_midi_device.c_str(), 1, 86)) {
 					printf("Binding RY-Axis");
 				}
 			}
 
 			if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_RZ) > 0) {
-				if (gui_tree_bind_axis("Axis RZ", 1, 86)) {
+				if (gui_tree_bind_axis("Axis RZ", selected_midi_device.c_str(), 1, 86)) {
 					printf("Binding RZ-Axis");
 				}
 			}
 
 			if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_SL0) > 0) {
-				if (gui_tree_bind_axis("Axis SL0", 1, 86)) {
+				if (gui_tree_bind_axis("Axis SL0", selected_midi_device.c_str(), 1, 86)) {
 					printf("Binding SL0-Axis");
 				}
 			}
 
 			if (GetVJDAxisExist(selected_vjoy_device, HID_USAGE_SL1) > 0) {
-				if (gui_tree_bind_axis("Axis SL1", 1, 86)) {
+				if (gui_tree_bind_axis("Axis SL1", selected_midi_device.c_str(), 1, 86)) {
 					printf("Binding SL1-Axis");
 				}
 			}
@@ -166,7 +185,7 @@ void gui_vjoy_device_monitor() {
 			if (button_count > 0) {
 				for (int i = 0; i < button_count; ++i) {
 					if (ImGui::TreeNode(std::to_string(i).c_str())) {
-						ImGui::Text("Channel: %d\tCC: %d", 1, 86);
+						gui_text_midi_binding(selected_midi_device.c_str(), 1, 86);
 						ImGui::SameLine();
 						ImGui::Button((std::string("Bind##button") + std::to_string(i)).c_str());
 						ImGui::TreePop();
@@ -182,24 +201,23 @@ void gui_vjoy_device_monitor() {
 	ImGui::End();
 }
 
-void gui_devices_midi() {
-	std::vector<std::string> fake_midi_devices;
+void gui_devices_midi(RtMidiIn* midi_in) {
+	std::vector<std::string> midi_devices = get_available_midi_devices(midi_in);
 
-	for (int i = 0; i < 5; ++i) fake_midi_devices.push_back(std::string("MIDI ") + std::to_string(i));
-	static int selected_midi_id = 0;
 	ImGui::Text("MIDI Devices");
-	ImGui::SameLine();
-	ImGui::Button("Refresh##midi_devices");
 
 	ImVec2 region = ImGui::GetContentRegionAvail();
 	ImGui::PushItemWidth(region.x);
 
-	if (ImGui::BeginCombo("##combo_MIDIDevices", fake_midi_devices[selected_midi_id].c_str())) {
+	static int combo_index = 0;
+	if (ImGui::BeginCombo("##combo_MIDIDevices", midi_devices[combo_index].c_str())) {
 
-		for (int i = 0; i < 5; ++i) {
-			bool is_selected = selected_midi_id == i;
-			if (ImGui::Selectable(fake_midi_devices[i].c_str(), is_selected)) {
-				selected_midi_id = i;
+		int count = midi_devices.size();
+		for (int i = 0; i < count; ++i) {
+			bool is_selected = combo_index == i;
+			if (ImGui::Selectable(midi_devices[i].c_str(), is_selected)) {
+				combo_index = i;
+				selected_midi_device = midi_devices[i];
 				break;
 			}
 		}
@@ -235,10 +253,10 @@ void gui_devices_vjoy() {
 	ImGui::PopItemWidth();
 }
 
-void gui_device_manager() {
+void gui_device_manager(RtMidiIn* midi_in) {
 	ImGui::Begin("Device Manager", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_AlwaysAutoResize);
 
-	gui_devices_midi();
+	gui_devices_midi(midi_in);
 	gui_devices_vjoy();
 
 	ImGui::End();
@@ -263,6 +281,12 @@ int main() {
 		return 1;
 	}
 #pragma endregion
+
+#pragma region MIDI Setup
+	RtMidiIn* midi_in = new RtMidiIn();
+	selected_midi_device = get_available_midi_devices(midi_in)[0];
+#pragma endregion
+
 
 #pragma region Window/OpenGL Setup
 	glfwInit();
@@ -305,8 +329,8 @@ int main() {
 		ImGuiID dockspace_id = ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
 		gui_dock_initial_layout(window,dockspace_id);
 
-		gui_vjoy_device_monitor();
-		gui_device_manager();
+		gui_vjoy_device_viewer();
+		gui_device_manager(midi_in);
 		gui_midi_monitor();
 
 		ImGui::Render();
@@ -327,6 +351,8 @@ int main() {
 
 #pragma region Cleanup
 
+	delete midi_in;
+	glfwTerminate();
 #pragma endregion
 
 	return 0;
