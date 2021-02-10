@@ -56,7 +56,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)thirdparty\glad\include\;$(ProjectDir)thirdparty\glfw3.3.2\include\;$(ProjectDir)thirdparty\vjoy-sdk\inc\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)thirdparty\json\include\;$(ProjectDir)thirdparty\glad\include\;$(ProjectDir)thirdparty\glfw3.3.2\include\;$(ProjectDir)thirdparty\vjoy-sdk\inc\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>__WINDOWS_MM__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -73,7 +73,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>$(ProjectDir)thirdparty\glad\include\;$(ProjectDir)thirdparty\glfw3.3.2\include\;$(ProjectDir)thirdparty\vjoy-sdk\inc\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)thirdparty\json\include\;$(ProjectDir)thirdparty\glad\include\;$(ProjectDir)thirdparty\glfw3.3.2\include\;$(ProjectDir)thirdparty\vjoy-sdk\inc\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>__WINDOWS_MM__;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
