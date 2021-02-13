@@ -5,6 +5,8 @@ VisualStudioVersion = 15.0.28307.1259
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "vJoyMidiFeeder", "vJoyMidiFeeder\vJoyMidiFeeder.vcxproj", "{62094675-4490-4D55-B83B-7C50CF35F7F9}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Feeder", "Feeder\Feeder.vcxproj", "{02135C72-82D0-4615-82C1-BBA5BC3B68A4}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -15,6 +17,10 @@ Global
 		{62094675-4490-4D55-B83B-7C50CF35F7F9}.Debug|x64.Build.0 = Debug|x64
 		{62094675-4490-4D55-B83B-7C50CF35F7F9}.Release|x64.ActiveCfg = Release|x64
 		{62094675-4490-4D55-B83B-7C50CF35F7F9}.Release|x64.Build.0 = Release|x64
+		{02135C72-82D0-4615-82C1-BBA5BC3B68A4}.Debug|x64.ActiveCfg = Debug|x64
+		{02135C72-82D0-4615-82C1-BBA5BC3B68A4}.Debug|x64.Build.0 = Debug|x64
+		{02135C72-82D0-4615-82C1-BBA5BC3B68A4}.Release|x64.ActiveCfg = Release|x64
+		{02135C72-82D0-4615-82C1-BBA5BC3B68A4}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

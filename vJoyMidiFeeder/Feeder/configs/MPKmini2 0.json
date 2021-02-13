@@ -1,0 +1,34 @@
+{
+    "axes": [
+        {
+            "device": 0,
+            "axis": "X",
+            "status": 176,
+            "value": 60
+        },
+        {
+            "device": 0,
+            "axis": "Y",
+            "status": 176,
+            "value": 61
+        },
+        {
+            "device": 0,
+            "axis": "Z",
+            "status": 176,
+            "value": 62
+        },
+        {
+            "device": 0,
+            "axis": "RX",
+            "status": 176,
+            "value": 63
+        },
+        {
+            "device": 0,
+            "axis": "SL1",
+            "status": 176,
+            "value": 64
+        }
+    ]
+}
